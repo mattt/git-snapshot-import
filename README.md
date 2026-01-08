@@ -39,8 +39,8 @@ Create a Git repository with one commit per snapshot:
 git-snapshot-import ./constitution-drafts ./constitution-git
 ```
 
-This creates `./constitution-git/` as a new Git repository
-where each commit corresponds to a snapshot, dated accordingly.
+This creates `./constitution-git/` as a new Git repository where each
+commit corresponds to a snapshot, dated accordingly.
 
 You can then view the commit history:
 
@@ -75,6 +75,15 @@ index 0000000..abc1234
 @@ -0,0 +1,10 @@
 +We the People of the United States...
 ```
+
+By default, snapshots are **incremental**:
+files carry forward between commits,
+so each snapshot directory needs only to contain files that changed.
+To delete a file,
+list it in the `"deleted"` field of `.git-snapshot.json`.
+
+With `--no-incremental`, files not present in a snapshot are deleted in that
+commit. Use this when each snapshot directory contains a complete copy of all files.
 
 ### Commands
 
