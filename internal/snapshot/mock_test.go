@@ -39,6 +39,8 @@ func (m *MockFS) AddFile(path string, content []byte) {
 	}
 }
 
+func (m *MockFS) EvalSymlinks(path string) (string, error) { return path, nil }
+
 func (m *MockFS) Stat(name string) (fs.FileInfo, error) {
 	if m.Err != nil {
 		return nil, m.Err
