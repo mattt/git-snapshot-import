@@ -75,6 +75,10 @@ func (imp *Importer) CreatePlan(sourceDir, targetDir string, opts ImportOptions)
 
 // Execute runs an import plan, creating Git commits
 func (imp *Importer) Execute(plan *Plan, opts ImportOptions) error {
+	if err := imp.checkOverlap(plan.SourceDir, plan.TargetDir); err != nil {
+		return err
+	}
+
 	// Check target directory
 	if _, err := imp.FS.Stat(plan.TargetDir); err == nil {
 		if !opts.Force {
@@ -135,6 +139,10 @@ func (imp *Importer) Continue(targetDir string, opts ImportOptions) error {
 		return fmt.Errorf("no interrupted import found: %w", err)
 	}
 
+	if err := imp.checkOverlap(state.SourceDir, targetDir); err != nil {
+		return err
+	}
+
 	fmt.Fprintf(imp.Stdout, "Resuming import: %d completed, %d remaining\n",
 		len(state.CompletedNames), len(state.PendingNames))
 
@@ -144,22 +152,19 @@ func (imp *Importer) Continue(targetDir string, opts ImportOptions) error {
 		return err
 	}
 
-	// Filter to only pending
-	pendingSet := make(map[string]bool)
-	for _, name := range state.PendingNames {
-		pendingSet[name] = true
+	// Use the saved order and check that every pending snapshot is available.
+	byName := make(map[string]Snapshot, len(allSnapshots))
+	for _, snapshot := range allSnapshots {
+		byName[snapshot.Name] = snapshot
 	}
-
 	var pending []Snapshot
-	for _, s := range allSnapshots {
-		if pendingSet[s.Name] {
-			pending = append(pending, s)
+	for _, name := range state.PendingNames {
+		snapshot, ok := byName[name]
+		if !ok {
+			return fmt.Errorf("pending snapshot %s is missing from %s", name, state.SourceDir)
 		}
+		pending = append(pending, snapshot)
 	}
-
-	sort.Slice(pending, func(i, j int) bool {
-		return pending[i].Timestamp.Before(pending[j].Timestamp)
-	})
 
 	// Process remaining
 	total := state.TotalSnapshots
@@ -171,8 +176,6 @@ func (imp *Importer) Continue(targetDir string, opts ImportOptions) error {
 		}
 
 		if err := imp.commitSnapshot(targetDir, snapshot, state.FullSnapshots); err != nil {
-			state.CompletedNames = append(state.CompletedNames, snapshot.Name)
-			state.PendingNames = state.PendingNames[1:]
 			if saveErr := imp.saveState(targetDir, state); saveErr != nil {
 				fmt.Fprintf(imp.Stderr, "warning: failed to save state: %v\n", saveErr)
 			}
@@ -192,6 +195,10 @@ func (imp *Importer) Abort(targetDir string) error {
 	state, err := imp.loadState(targetDir)
 	if err != nil {
 		return fmt.Errorf("no interrupted import found: %w", err)
+	}
+
+	if err := imp.checkOverlap(state.SourceDir, targetDir); err != nil {
+		return err
 	}
 
 	// Remove the entire target directory

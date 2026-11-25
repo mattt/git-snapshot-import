@@ -10,6 +10,7 @@ import (
 
 // FileSystem abstracts filesystem operations for testing
 type FileSystem interface {
+	EvalSymlinks(path string) (string, error)
 	Stat(name string) (fs.FileInfo, error)
 	ReadDir(name string) ([]fs.DirEntry, error)
 	ReadFile(name string) ([]byte, error)
@@ -31,6 +32,7 @@ type GitRunner interface {
 // OSFileSystem implements FileSystem using the real OS
 type OSFileSystem struct{}
 
+func (OSFileSystem) EvalSymlinks(path string) (string, error)          { return filepath.EvalSymlinks(path) }
 func (OSFileSystem) Stat(name string) (fs.FileInfo, error)             { return os.Stat(name) }
 func (OSFileSystem) ReadDir(name string) ([]fs.DirEntry, error)        { return os.ReadDir(name) }
 func (OSFileSystem) ReadFile(name string) ([]byte, error)              { return os.ReadFile(name) }
